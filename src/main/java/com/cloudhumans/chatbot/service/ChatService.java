@@ -2,6 +2,10 @@ package com.cloudhumans.chatbot.service;
 
 import com.cloudhumans.chatbot.model.embedding.EmbeddingRequest;
 import com.cloudhumans.chatbot.model.embedding.EmbeddingResponse;
+import com.cloudhumans.chatbot.model.llm.ChatCompletionRequest;
+import com.cloudhumans.chatbot.model.llm.ChatCompletionResponse;
+import com.cloudhumans.chatbot.model.llm.Message;
+import com.cloudhumans.chatbot.model.response.ConversationResponse;
 import com.cloudhumans.chatbot.model.search.DatabaseSearchResponse;
 import com.cloudhumans.chatbot.model.search.SearchResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,32 +44,67 @@ public class ChatService {
     @Value("${database.search.api-key}")
     private String dbApiKey;
 
-    public String getAnswer(String question) {
-        List<Double> vector = fetchEmbeddingVector(question);
+    @Value("${openai.chat.url}")
+    private String openAiChatUrl;
+
+    @Value("${openai.chat.api-key}")
+    private String openAiApiKey;
+
+    @Value("${openai.chat.model}")
+    private String openAiModel;
+
+    public ConversationResponse getAnswer(String projectName, String userMessage) {
+        List<Double> vector = fetchEmbeddingVector(userMessage);
         if (vector == null) {
-            return "Erro ao gerar embedding.";
+            return new ConversationResponse(
+                    List.of(
+                            new Message("USER", userMessage),
+                            new Message("AGENT", "Erro ao gerar embedding.")
+                    ),
+                    true,
+                    List.of()
+            );
         }
 
-        List<SearchResult> results = queryDatabase(vector);
+        List<SearchResult> results = queryDatabase(vector, projectName);
         if (results == null || results.isEmpty()) {
-            return "Desculpe, não encontrei uma resposta para sua pergunta.";
+            return new ConversationResponse(
+                    List.of(
+                            new Message("USER", userMessage),
+                            new Message("AGENT", "Desculpe, não encontrei uma resposta para sua pergunta.")
+                    ),
+                    true,
+                    List.of()
+            );
         }
 
-        return results.stream()
-                .max(Comparator.comparingDouble(SearchResult::getSearchScore))
+        String context = results.stream()
                 .map(SearchResult::getContent)
-                .orElse("Desculpe, não encontrei uma resposta.");
+                .reduce("", (a, b) -> a + "\n" + b);
+
+        String llmResponse = callGpt4(userMessage, context);
+        boolean shouldEscalate = llmResponse != null && llmResponse.toLowerCase().contains("i will escalate");
+        boolean hasN2 = results.stream().anyMatch(r -> "N2".equalsIgnoreCase(r.getType()));
+
+        return new ConversationResponse(
+                List.of(
+                        new Message("USER", userMessage),
+                        new Message("AGENT", llmResponse != null ? llmResponse : "Erro ao gerar resposta via LLM.")
+                ),
+                hasN2 || shouldEscalate,
+                results
+        );
     }
 
-    private List<Double> fetchEmbeddingVector(String question) {
-        EmbeddingRequest request = new EmbeddingRequest(question, embeddingModel);
+    private List<Double> fetchEmbeddingVector(String input) {
+        EmbeddingRequest request = new EmbeddingRequest(input, embeddingModel);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(embeddingApiKey);
 
         HttpEntity<EmbeddingRequest> entity = new HttpEntity<>(request, headers);
 
-        logger.info("Enviando para openAI:");
+        logger.info("Enviando texto para embedding API...");
 
         try {
             ResponseEntity<String> rawResponse = restTemplate.exchange(
@@ -74,18 +113,16 @@ public class ChatService {
                     entity,
                     String.class
             );
-
-            logger.info("Retorno com sucesso da openAI");
-
+            logger.info("Embedding gerado com sucesso.");
             EmbeddingResponse response = objectMapper.readValue(rawResponse.getBody(), EmbeddingResponse.class);
             return response.getFirstEmbedding();
         } catch (Exception e) {
-            logger.error("Erro ao chamar a openAI:", e);
+            logger.error("Erro ao chamar a API de embeddings:", e);
             return null;
         }
     }
 
-    private List<SearchResult> queryDatabase(List<Double> vector) {
+    private List<SearchResult> queryDatabase(List<Double> vector, String projectName) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("api-key", dbApiKey);
@@ -103,19 +140,17 @@ public class ChatService {
                   "count": true,
                   "select": "content, type",
                   "top": 10,
-                  "filter": "projectName eq 'tesla_motors'",
+                  "filter": "projectName eq '%s'",
                   "vectorQueries": [
                     {
                       "vector": %s,
-                      "k": 3,
+                      "k": 10,
                       "fields": "embeddings",
                       "kind": "vector"
                     }
                   ]
                 }
-                """, vectorJson);
-
-        logger.info("Enviando requisição ao banco:");
+                """, projectName, vectorJson);
 
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
 
@@ -126,14 +161,46 @@ public class ChatService {
                     entity,
                     String.class
             );
-
-            logger.info("Resposta bruta do banco:");
-            logger.info(rawResponse.getBody());
-
+            logger.info("Resultados recuperados do vector DB.");
             DatabaseSearchResponse typedResponse = objectMapper.readValue(rawResponse.getBody(), DatabaseSearchResponse.class);
             return typedResponse.getValue();
         } catch (Exception e) {
-            logger.error("Erro ao consultar o banco:", e);
+            logger.error("Erro ao consultar o vector DB:", e);
+            return null;
+        }
+    }
+
+    private String callGpt4(String userMessage, String context) {
+        List<Message> messages = List.of(
+                new Message("system", """
+                        You are a Tesla support assistant. 
+                        Only answer questions using the provided context. 
+                        If the answer is not explicitly mentioned in the context, respond with:
+                        "I'm sorry, I couldn't find this information in our records. I will escalate this request to a human assistant."
+
+                        Never use external or general knowledge, even if you know the answer.
+                        """),
+                new Message("user", "Context:\n" + context + "\n\nQuestion: " + userMessage)
+        );
+
+        ChatCompletionRequest request = new ChatCompletionRequest(openAiModel, messages);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(openAiApiKey);
+
+        HttpEntity<ChatCompletionRequest> entity = new HttpEntity<>(request, headers);
+
+        try {
+            ResponseEntity<ChatCompletionResponse> response = restTemplate.exchange(
+                    openAiChatUrl,
+                    HttpMethod.POST,
+                    entity,
+                    ChatCompletionResponse.class
+            );
+            return response.getBody().getChoices().get(0).getMessage().getContent();
+        } catch (Exception e) {
+            logger.error("Erro ao chamar o modelo GPT-4:", e);
             return null;
         }
     }
