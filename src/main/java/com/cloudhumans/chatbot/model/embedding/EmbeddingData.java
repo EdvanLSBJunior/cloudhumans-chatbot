@@ -1,4 +1,5 @@
 package com.cloudhumans.chatbot.model.embedding;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import lombok.Data;

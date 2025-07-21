@@ -17,7 +17,6 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -26,8 +25,8 @@ public class ChatService {
 
     private static final Logger logger = LogManager.getLogger(ChatService.class);
 
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
     @Value("${cloudhumans.embedding.url}")
     private String embeddingApiUrl;
@@ -83,7 +82,7 @@ public class ChatService {
                 .reduce("", (a, b) -> a + "\n" + b);
 
         String llmResponse = callGpt4(userMessage, context);
-        boolean shouldEscalate = llmResponse != null && llmResponse.toLowerCase().contains("i will escalate");
+
         boolean hasN2 = results.stream().anyMatch(r -> "N2".equalsIgnoreCase(r.getType()));
 
         return new ConversationResponse(
@@ -91,7 +90,7 @@ public class ChatService {
                         new Message("USER", userMessage),
                         new Message("AGENT", llmResponse != null ? llmResponse : "Erro ao gerar resposta via LLM.")
                 ),
-                hasN2 || shouldEscalate,
+                hasN2,
                 results
         );
     }

@@ -12,5 +12,5 @@ import java.util.List;
 public class ConversationResponse {
     private List<Message> messages;
     private boolean handoverToHumanNeeded;
-    private List<SearchResult> sectionsRetrieved;
+    private List<SearchResult> results;
 }
