@@ -37,13 +37,11 @@ A implementação utiliza **Spring Boot**, integração com APIs externas (embed
 ### 3. Execute via docker
 ```
 docker compose up --build
-
 ```
 
 ### A API estará disponível em:
 ```
 http://localhost:8080/chat
-
 ```
 ## Testes Unitários
 
