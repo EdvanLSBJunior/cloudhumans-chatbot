@@ -43,6 +43,22 @@ docker compose up --build
 ```
 http://localhost:8080/chat
 ```
+
+## Estrutura da requisição
+```
+  curl -X POST http://localhost:8080/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "projectName": "tesla_motors",
+    "messages": [
+      {
+        "role": "USER",
+        "content": "How long does a Tesla battery last before it needs to be replaced?"
+      }
+    ]
+  }'
+```
+  
 ## Testes Unitários
 
 Todos os testes estão localizados em:
