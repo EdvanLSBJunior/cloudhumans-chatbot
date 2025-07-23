@@ -1,50 +1,50 @@
 # Chatbot Tesla - Cloud Humans Take Home
 
-Este projeto foi desenvolvido como parte de um desafio técnico da Cloud Humans. O objetivo é implementar uma aplicação baseada em arquitetura **RAG (Retrieval-Augmented Generation)** e **LLM (Large Language Model)** para responder perguntas de usuários com base em dados contextualizados.
+This project was developed as part of a technical challenge by Cloud Humans. The goal is to implement an application based on **RAG (Retrieval-Augmented Generation)** architecture and **LLM (Large Language Model)** to answer user questions using contextualized data.
 
-A implementação utiliza **Spring Boot**, integração com APIs externas (embedding, base vetorial e OpenAI) e a **regra de resposta número 2**, conhecida como **Handover Feature**, onde o sistema identifica se a resposta deve ser repassada para um atendente humano.
+The implementation uses **Spring Boot**, integration with external APIs (embedding, vector database, and OpenAI), and **Response Rule #2**, known as the **Handover Feature**, where the system determines if the response should be handed off to a human agent.
 
 ---
 
-## Tecnologias Utilizadas
+## Technologies Used
 
 - Java 17
 - Spring Boot 3
-- Docker e Docker Compose
-- OpenAI API (Chat e Embeddings)
-- Arquitetura RAG (Retrieval-Augmented Generation)
-- JUnit 5 + Mockito para testes unitários
-- Log4j2 para logging
-- Maven como gerenciador de dependências
+- Docker and Docker Compose
+- OpenAI API (Chat and Embeddings)
+- RAG Architecture (Retrieval-Augmented Generation)
+- JUnit 5 + Mockito for unit testing
+- Log4j2 for logging
+- Maven as dependency manager
 
 ---
 
-## Como rodar o projeto
+## How to Run the Project
 
-### 1. Pré-requisitos
+### Prerequisites
 
-- Docker e Docker Compose instalados
-- Java 17 (apenas se for rodar sem Docker)
-- Chave de acesso OpenAI
-- Chave de acesso do VectorDB
+- Docker and Docker Compose installed
+- Java 17 (only if running without Docker)
+- OpenAI API key
+- VectorDB API key
 
 ---
 
-### 2. Na raiz do projeto existe um `.env` onde é necessário acrescentar as chaves de acesso reais da openAI e vectorDB:
+### In the project root, there is a `.env` file where you must add your actual OpenAI and VectorDB keys:
 
-> **Observação:** As chaves reais não são fornecidas neste repositório por segurança. Preencha conforme suas credenciais.
+> **Note:** Real keys are not provided in this repository for security reasons. Fill it in with your own credentials.
 
-### 3. Execute via docker
+### Run with Docker
 ```
 docker compose up --build
 ```
 
-### A API estará disponível em:
+### The API will be available at:
 ```
 http://localhost:8080/chat
 ```
 
-## Estrutura da requisição
+## Request Structure
 ```
   curl -X POST http://localhost:8080/chat \
   -H "Content-Type: application/json" \
@@ -59,38 +59,38 @@ http://localhost:8080/chat
   }'
 ```
   
-## Testes Unitários
+## Unit Tests
 
-Todos os testes estão localizados em:
-  src/test/java/com/cloudhumans/chatbot/service/ChatServiceTest.java
+All tests are located at:  
+  `src/test/java/com/cloudhumans/chatbot/service/ChatServiceTest.java`
 
-Eles validam o fluxo completo da arquitetura **RAG (Retrieval-Augmented Generation)**:
+They validate the complete flow of the **RAG (Retrieval-Augmented Generation)** architecture:
 
-- Criação do vetor de embedding  
-- Consulta ao banco vetorial  
-- Consulta à OpenAI  
-- Resposta com possível ativação do **handover humano**
+- Embedding vector creation  
+- Query to the vector database  
+- Query to OpenAI  
+- Response with potential **human handover** activation
 
 ---
 
-## Arquitetura RAG e Lógica de Resposta
+## RAG Architecture and Response Logic
 
-O projeto segue a arquitetura **RAG (Retrieval-Augmented Generation)** com os seguintes passos:
+The project follows the **RAG (Retrieval-Augmented Generation)** architecture with the following steps:
 
-1. A pergunta do usuário é convertida em vetor via endpoint de **embedding**.
-2. O vetor é enviado ao **banco vetorial**, retornando os documentos mais relevantes.
-3. Esses documentos são enviados ao **modelo da OpenAI** junto da pergunta original.
-4. A resposta final é analisada:
-   - Se o tipo do documento retornado for `"N2"` (não crítico), o sistema **ativa o handover** para um atendente humano.
-   - Caso contrário, a resposta é retornada diretamente ao usuário.
+1. The user's question is converted into a vector via the **embedding** endpoint.
+2. The vector is sent to the **vector database**, returning the most relevant documents.
+3. These documents are sent to the **OpenAI model** along with the original question.
+4. The final response is analyzed:
+   - If the returned document type is `"N2"` (non-critical), the system **activates the handover** to a human agent.
+   - Otherwise, the response is returned directly to the user.
 
-Esta lógica implementa a **opção 2 do desafio da Cloud Humans**, também conhecida como **Handover Feature**.
+This logic implements **Option 2** of the Cloud Humans challenge, also known as the **Handover Feature**.
 
-## Observações
+## Notes
 
-- O arquivo .env foi incluído intencionalmente no repositório com as chaves em branco por se tratar de um desafio técnico.
-- Em ambientes reais, este arquivo deve estar no .gitignore.
-- Todos os endpoints externos foram mockados nos testes unitários.
+- The `.env` file was intentionally included in the repository with blank keys since this is a technical challenge.
+- In real-world environments, this file should be listed in `.gitignore`.
+- All external endpoints were mocked in the unit tests.
 
-## Autor
-Desenvolvido por Edvan Junior como parte do processo seletivo da Cloud Humans.
+## Author
+Developed by **Edvan Junior** as part of the **Cloud Humans** selection process.
